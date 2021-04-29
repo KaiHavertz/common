@@ -1,17 +1,19 @@
-package org.jnr.regcal.utils.jwt;
+package org.jnr.regcal.common.jwt;
 
+import cn.hutool.core.lang.UUID;
 import cn.hutool.core.util.StrUtil;
 import com.alibaba.fastjson.JSONObject;
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.JWTVerifier;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.interfaces.DecodedJWT;
-
-import org.jnr.regcal.entity.Subscriber;
+import lombok.NonNull;
+import org.jnr.regcal.javaBean.entity.Subscriber;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
 import java.util.Calendar;
 
 /**
@@ -37,9 +39,9 @@ public class JwtUtils {
 
 
     /**
-     * 登录Token有效期
+     * 登录Token有效期 1 小时
      */
-    public static final Integer VALID_SECONDS = 3600 * 10;
+    public static final Integer VALID_SECONDS = 60 * 60;
 
     private static final Logger logger = LoggerFactory.getLogger(JwtUtils.class);
 
@@ -51,13 +53,13 @@ public class JwtUtils {
      * @param validSecond
      * @return
      */
-    public static String encodeToken(Subscriber subscriber, int validSecond) {
+    public static String encodeToken(@NonNull Subscriber subscriber, int validSecond) {
         Calendar calendar = Calendar.getInstance();
         calendar.add(Calendar.SECOND, validSecond);
-
         JSONObject obj = new JSONObject();
-        obj.put("account", subscriber.getAccount());
-        obj.put("usertype", subscriber.getUserType());
+        obj.put("account", subscriber.getAccount() == null ? UUID.randomUUID() : subscriber.getAccount());
+        obj.put("usertype", subscriber.getUserType() == null ? UUID.randomUUID() : subscriber.getUserType());
+        obj.put("roleList", subscriber.getRoleList() == null ? UUID.randomUUID() : subscriber.getRoleList());
         String token = JWT.create()
                 .withClaim("subscriber", obj.toJSONString())//生成携带自定义信息
                 .withExpiresAt(calendar.getTime())//设置 载荷 签名过期的时间
@@ -97,12 +99,12 @@ public class JwtUtils {
         if (StrUtil.isEmpty(token)) {
             return false;
         }
-//        return JWT.decode(token).getExpiresAt().after(Calendar.getInstance().getTime());
         try {
             Subscriber subscriber = decodeToken(token);
             JSONObject obj = new JSONObject();
             obj.put("account", subscriber.getAccount());
             obj.put("usertype", subscriber.getUserType());
+            obj.put("roleList", subscriber.getRoleList());
             JWTVerifier verifier = JWT.require(ALGORITHM)
                     .withClaim("subscriber", obj.toJSONString())
                     .build();
@@ -116,22 +118,16 @@ public class JwtUtils {
         }
     }
 
-
-    //编码api方式登录用户
-    public static String encode(String openid, int validSecond) {
-        Calendar calendar = Calendar.getInstance();
-        calendar.add(Calendar.SECOND, validSecond);
-        return JWT.create()
-                .withClaim("openid", openid)
-                .withExpiresAt(calendar.getTime()).sign(ALGORITHM);
+    public static void main(String[] args) {
+        Subscriber subscriber = new Subscriber();
+        subscriber.setAccount("猪猪康");
+        subscriber.setRoleList(new ArrayList<>());
+        subscriber.setUserType(3);
+        String token = JwtUtils.encodeToken(subscriber);
+        System.out.println(token);
+        System.out.println(JwtUtils.validToken(token)
+        );
+        Subscriber result = JwtUtils.decodeToken(token);
+        System.out.println(result);
     }
-
-
-    //解码api方式登录用户
-    public static String decode(String token) {
-        DecodedJWT decodedJWT = JWT.decode(token);
-        return decodedJWT.getClaim("openid").as(String.class);
-    }
-
-
 }
